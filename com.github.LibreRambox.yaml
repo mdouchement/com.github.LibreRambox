@@ -1,0 +1,81 @@
+id: com.github.LibreRambox
+base: org.electronjs.Electron2.BaseApp
+base-version: '23.08'
+runtime: org.freedesktop.Platform
+runtime-version: '23.08'
+sdk: org.freedesktop.Sdk
+command: librerambox
+separate-locales: false
+finish-args:
+  # X11 performance
+  - --share=ipc
+  # We need X11
+  - --socket=x11
+  # Access to wayland
+  - --socket=wayland
+  # Audio Access
+  - --socket=pulseaudio
+  # All devices (camera, microphone for calls)
+  - --device=all
+  # Network Access
+  - --share=network
+  # We need to be able to inhibit sleep
+  - --system-talk-name=org.freedesktop.login1
+  - --talk-name=org.gnome.SessionManager
+  - --talk-name=org.freedesktop.PowerManagement
+  - --talk-name=org.freedesktop.ScreenSaver
+  # These are for notifications/tray icons
+  - --talk-name=org.gnome.Mutter.IdleMonitor
+  - --talk-name=org.kde.StatusNotifierWatcher
+  - --talk-name=com.canonical.AppMenu.Registrar
+  - --talk-name=com.canonical.indicator.application
+  - --talk-name=org.ayatana.indicator.application
+  # Environment Variables to control the behavior
+  - --env=LIBRERAMBOX_USE_TRAY_ICON=0
+  - --env=LIBRERAMBOX_START_IN_TRAY=0
+  - --env=LIBRERAMBOX_USE_WAYLAND=0
+  - --env=LIBRERAMBOX_DISABLE_GPU=0
+  - --env=LIBRERAMBOX_DISABLE_GPU_SANDBOX=0
+  # Use same mouse cursors as host
+  - --env=XCURSOR_PATH=/run/host/user-share/icons:/run/host/share/icons
+
+modules:
+  - name: librerambox
+    buildsystem: simple
+    build-commands:
+      - |
+        bsdtar -Oxf LibreRambox.deb 'data.tar.xz' |
+          bsdtar -xf - \
+            --exclude='./usr/share/doc'
+      - |
+        if [ -d "opt/LibreRambox" ]; then
+          mv "opt/LibreRambox" "${FLATPAK_DEST}/LibreRambox"
+        else
+          exit 1
+        fi
+
+        install -Dm0644 "usr/share/applications/librerambox${BETA_SUFFIX}.desktop" "${FLATPAK_DEST}/share/applications/${FLATPAK_ID}.desktop"
+
+        for size in 16 24 32 48 64 128 256 512; do
+          install -Dm0644 "usr/share/icons/hicolor/${size}x${size}/apps/librerambox.png" "${FLATPAK_DEST}/share/icons/hicolor/${size}x${size}/apps/${FLATPAK_ID}.png"
+        done
+      - install -Dm0755 librerambox.sh "${FLATPAK_DEST}/bin/librerambox"
+      - install -Dm0644 "${FLATPAK_ID}.metainfo.xml" "${FLATPAK_DEST}/share/metainfo/${FLATPAK_ID}.metainfo.xml"
+      - desktop-file-edit --set-key=Exec --set-value='librerambox %U' "${FLATPAK_DEST}/share/applications/${FLATPAK_ID}.desktop"
+      - desktop-file-edit --set-key=Icon --set-value="${FLATPAK_ID}" "${FLATPAK_DEST}/share/applications/${FLATPAK_ID}.desktop"
+    sources:
+      - type: file
+        only-arches:
+          - x86_64
+        dest-filename: LibreRambox.deb
+        url: https://github.com/LibreRambox/LibreRambox/releases/download/v0.10.1/LibreRambox-0.10.1-linux-amd64.deb
+        sha256: 6ebb624d273f7e8e8d4b01a248f21dafdccbbc236c4863a34b1005b11fd5c635
+        x-data-checker:
+          type: json
+          url: https://api.github.com/repos/LibreRambox/LibreRambox/releases/latest
+          url-query: .assets[] | select(.name=="LibreRambox-" + $version + "-linux-amd64.deb")
+            | .browser_download_url
+      - type: file
+        path: librerambox.sh
+      - type: file
+        path: com.github.LibreRambox.metainfo.xml
